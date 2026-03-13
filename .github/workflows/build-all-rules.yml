@@ -1,6 +1,6 @@
 name: Auto Build Sing-box SRS (Full & IP Merged Version)
 
-于:
+on:
   workflow_dispatch: 
   schedule:
     - cron: '30 22 * * *' 
@@ -16,6 +16,7 @@ jobs:
 
       - name: Download upstream ALL rule
         run: |
+          # 已经替换为你最新发现的 10007_auto 仓库的纯净版链接
           curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007_auto/master/all" -o raw_all.txt
 
       - name: Merge Domains and IPs using Python
@@ -23,50 +24,57 @@ jobs:
           cat << 'EOF' > build_json.py
           import json, re
 
-          ips = []
-          domains = []
+          ips = set()
+          domains_exact = set()
+          domains_suffix = set()
 
           with open("raw_all.txt", "r", encoding="utf-8") as f:
               for line in f:
-                  # strip() 完美解决 Windows/Linux 换行符和空格问题
-                  line = line.strip() 
-                  
-                  # 提取 0.0.0.0 后面的纯 IP
-                  if line.startswith("0.0.0.0 "):
+                  line = line.strip()
+                  if not line or line.startswith("#"):
+                      continue
+                      
+                  # 1. 完美解析 Hosts 格式 (如 0.0.0.0 example.com)
+                  if line.startswith("0.0.0.0 ") or line.startswith("127.0.0.1 "):
                       parts = line.split()
                       if len(parts) >= 2:
-                          ip = parts[1]
-                          if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", ip):
-                              ips.append(ip + "/32")
+                          target = parts[1]
+                          # 过滤掉 localhost 等本地防投毒地址
+                          if target in ["localhost", "hostname"] or target.startswith("ip6-"):
+                              continue
+                          # 判断它到底是个 IP 还是个域名
+                          if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", target):
+                              ips.add(target + "/32")
+                          else:
+                              domains_exact.add(target)
                               
-                  # 提取 ||域名^ 格式的纯域名
+                  # 2. 兼容解析 AdGuard 格式 (如 ||example.com^)
                   elif line.startswith("||") and line.endswith("^"):
-                      domain = line[2:-1] # 掐头去尾
-                      domains.append(domain)
+                      domain = line[2:-1]
+                      domains_suffix.add(domain)
 
-          # 组装为标准的 Sing-box rule-set 结构
+          # 组装为标准的 Sing-box 源码格式
           rules = []
           if ips:
-              rules.append({"ip_cidr": ips})
-          if domains:
-              rules.append({"domain_suffix": domains})
+              rules.append({"ip_cidr": list(ips)})
+          if domains_exact:
+              rules.append({"domain": list(domains_exact)})
+          if domains_suffix:
+              rules.append({"domain_suffix": list(domains_suffix)})
 
           output = {
               "version": 2,
               "rules": rules
           }
 
-          # 导出为 JSON 文件
           with open("all_source.json", "w", encoding="utf-8") as f:
               json.dump(output, f, indent=2)
           EOF
           
-          # 运行 Python 脚本
           python3 build_json.py
 
       - name: Compile to Single SRS
         run: |
-          # 用 Sing-box 编译刚刚生成的完美 JSON
           docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir ghcr.io/sagernet/sing-box:latest rule-set compile all_source.json -o all.srs
 
       - name: Commit and Push SRS

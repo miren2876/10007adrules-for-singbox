@@ -1,25 +1,26 @@
 name: Auto Build Sing-box SRS
 
 on:
-  workflow_dispatch: # 允许你在网页上手动点击运行
+  workflow_dispatch: 
   schedule:
-    - cron: '0 22 * * *' # 每天北京时间早上 6 点自动运行 (UTC 22:00)
+    - cron: '0 22 * * *' 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 👇 修复 128 错误的神器：强行赋予本次运行读写权限
+    permissions:
+      contents: write  
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Download upstream reward rule
         run: |
-          # 下载 10007_auto 的 reward 规则并保存为 txt
           curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007_auto/master/reward" -o reward.txt
 
       - name: Convert to SRS using Sing-box
         run: |
-          # 直接调用官方最新的 docker 镜像进行转换，免去安装配置步骤
           docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir ghcr.io/sagernet/sing-box:latest rule-set convert --type adguard --output reward.srs reward.txt
 
       - name: Commit and Push SRS file
@@ -27,6 +28,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add reward.srs
-          # 如果文件有更新就提交，没更新就跳过
-          git commit -m "Auto update reward.srs $(date +'%Y-%m-%d')" || exit 0
+          git commit -m "Auto update reward.srs" || echo "No changes to commit"
           git push

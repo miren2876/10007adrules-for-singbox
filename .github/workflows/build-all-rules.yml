@@ -3,14 +3,14 @@ name: Auto Build Sing-box SRS (Full & IP Merged Version)
 on:
   workflow_dispatch: 
   schedule:
-    - cron: '30 22 * * *' # 每天北京时间早上 6:30 自动运行 (UTC 22:30)，错开时间
+    - cron: '30 22 * * *' 
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 赋予写入权限
-steps:
+      contents: write
+    steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -20,7 +20,6 @@ steps:
 
       - name: Merge Domains and IPs using Python
         run: |
-          # 编写一个强壮的 Python 脚本来处理文本和生成 JSON
           cat << 'EOF' > build_json.py
           import json, re
 

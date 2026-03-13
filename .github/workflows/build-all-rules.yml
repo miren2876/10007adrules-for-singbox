@@ -1,0 +1,35 @@
+name: Auto Build Sing-box SRS (Full Version)
+
+on:
+  workflow_dispatch: 
+  schedule:
+    # 为了防止和 reward 规则同时运行抢占资源，我把这个设置在每天北京时间早上 6:30 (UTC 22:30)
+    - cron: '30 22 * * *' 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 依然带上我们上次验证过的“尚方宝剑”，防止 128 报错
+    permissions:
+      contents: write  
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download upstream ALL rule
+        run: |
+          # 替换为你提供的不保留奖励的完整版链接，并保存为 all.txt
+          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007/main/all" -o all.txt
+
+      - name: Convert to SRS using Sing-box
+        run: |
+          # 将 all.txt 编译为 all.srs
+          docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir ghcr.io/sagernet/sing-box:latest rule-set convert --type adguard --output all.srs all.txt
+
+      - name: Commit and Push SRS file
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add all.srs
+          git commit -m "Auto update all.srs" || echo "No changes to commit"
+          git push

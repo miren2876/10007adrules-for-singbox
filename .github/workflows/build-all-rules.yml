@@ -1,6 +1,6 @@
 name: Auto Build Sing-box SRS (Full & IP Merged Version)
 
-on:
+于:
   workflow_dispatch: 
   schedule:
     - cron: '30 22 * * *' 
@@ -16,7 +16,7 @@ jobs:
 
       - name: Download upstream ALL rule
         run: |
-          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007/main/all" -o raw_all.txt
+          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007_auto/master/all" -o raw_all.txt
 
       - name: Merge Domains and IPs using Python
         run: |

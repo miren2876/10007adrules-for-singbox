@@ -1,5 +1,5 @@
 # 10007adrules-for-singbox
-将10007大佬的广告规则转为sing-box规则
+将10007大佬的广告规则转为sing-box规则（本项目没啥技术含量，纯纯ai弄的，包括介绍）
 # 🛡️ Sing-box 去广告规则自动构建 (10007_auto)
 
 本项目利用 GitHub Actions，每天定时自动抓取上游优秀的去广告规则（AdGuard 格式），并调用 Sing-box 官方内核，将其编译为极其轻量、高性能的二进制 `.srs` 规则集。

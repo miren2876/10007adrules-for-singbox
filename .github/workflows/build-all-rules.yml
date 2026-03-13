@@ -1,16 +1,4 @@
-name: Auto Build Sing-box SRS (Full & IP Merged Version)
-
-on:
-  workflow_dispatch: 
-  schedule:
-    - cron: '30 22 * * *' # 每天北京时间早上 6:30 自动运行 (UTC 22:30)，错开时间
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # 赋予写入权限
-    steps:
+steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -18,27 +6,56 @@ jobs:
         run: |
           curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007/main/all" -o raw_all.txt
 
-      - name: Merge Domains and IPs into ONE Sing-box Source
+      - name: Merge Domains and IPs using Python
         run: |
-          # 创建 JSON 外壳
-          echo '{"version": 2, "rules": [' > all_source.json
+          # 编写一个强壮的 Python 脚本来处理文本和生成 JSON
+          cat << 'EOF' > build_json.py
+          import json, re
 
-          # 处理提取出的纯 IP
-          echo '{"ip_cidr": [' >> all_source.json
-          grep "^0\.0\.0\.0 " raw_all.txt | awk '{print $2}' | grep -E "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$" | awk '{printf "\"%s/32\",\n", $1}' | sed '$ s/,$//' >> all_source.json
-          echo ']},' >> all_source.json
+          ips = []
+          domains = []
 
-          # 处理提取出的纯域名 (去掉 || 和 ^)
-          echo '{"domain_suffix": [' >> all_source.json
-          grep "^||" raw_all.txt | grep "\^$" | sed 's/^||//; s/\^$//' | awk '{printf "\"%s\",\n", $1}' | sed '$ s/,$//' >> all_source.json
-          echo ']}' >> all_source.json
+          with open("raw_all.txt", "r", encoding="utf-8") as f:
+              for line in f:
+                  # strip() 完美解决 Windows/Linux 换行符和空格问题
+                  line = line.strip() 
+                  
+                  # 提取 0.0.0.0 后面的纯 IP
+                  if line.startswith("0.0.0.0 "):
+                      parts = line.split()
+                      if len(parts) >= 2:
+                          ip = parts[1]
+                          if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", ip):
+                              ips.append(ip + "/32")
+                              
+                  # 提取 ||域名^ 格式的纯域名
+                  elif line.startswith("||") and line.endswith("^"):
+                      domain = line[2:-1] # 掐头去尾
+                      domains.append(domain)
 
-          # 闭合 JSON 外壳
-          echo ']}' >> all_source.json
+          # 组装为标准的 Sing-box rule-set 结构
+          rules = []
+          if ips:
+              rules.append({"ip_cidr": ips})
+          if domains:
+              rules.append({"domain_suffix": domains})
+
+          output = {
+              "version": 2,
+              "rules": rules
+          }
+
+          # 导出为 JSON 文件
+          with open("all_source.json", "w", encoding="utf-8") as f:
+              json.dump(output, f, indent=2)
+          EOF
+          
+          # 运行 Python 脚本
+          python3 build_json.py
 
       - name: Compile to Single SRS
         run: |
-          # 编译成最终的 all.srs
+          # 用 Sing-box 编译刚刚生成的完美 JSON
           docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir ghcr.io/sagernet/sing-box:latest rule-set compile all_source.json -o all.srs
 
       - name: Commit and Push SRS
@@ -46,5 +63,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add all.srs
-          git commit -m "Auto update merged all.srs $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git commit -m "Auto update merged all.srs" || echo "No changes to commit"
           git push

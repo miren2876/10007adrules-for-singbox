@@ -1,17 +1,15 @@
-name: Auto Build Sing-box SRS (Full Version)
+name: Auto Build Sing-box SRS (Full & IP Merged Version)
 
-于:
+on:
   workflow_dispatch: 
   schedule:
-    # 为了防止和 reward 规则同时运行抢占资源，我把这个设置在每天北京时间早上 6:30 (UTC 22:30)
-    - cron: '30 22 * * *' 
+    - cron: '30 22 * * *' # 每天北京时间早上 6:30 自动运行 (UTC 22:30)，错开时间
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 依然带上我们上次验证过的“尚方宝剑”，防止 128 报错
     permissions:
-      contents: write  
+      contents: write  # 赋予写入权限
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -22,29 +20,25 @@ jobs:
 
       - name: Merge Domains and IPs into ONE Sing-box Source
         run: |
-          # 1. 创建一个合法的 Sing-box JSON 规则集外壳
+          # 创建 JSON 外壳
           echo '{"version": 2, "rules": [' > all_source.json
 
-          # 2. 处理 IP (提取 0.0.0.0 后面的纯 IP)
-          # 注意：为了防止最后一个元素多出逗号导致 JSON 报错，我们用一个小技巧
+          # 处理提取出的纯 IP
           echo '{"ip_cidr": [' >> all_source.json
           grep "^0\.0\.0\.0 " raw_all.txt | awk '{print $2}' | grep -E "^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$" | awk '{printf "\"%s/32\",\n", $1}' | sed '$ s/,$//' >> all_source.json
           echo ']},' >> all_source.json
 
-          # 3. 处理域名 (提取以 || 开头，以 ^ 结尾的 AdGuard 域名格式)
+          # 处理提取出的纯域名 (去掉 || 和 ^)
           echo '{"domain_suffix": [' >> all_source.json
           grep "^||" raw_all.txt | grep "\^$" | sed 's/^||//; s/\^$//' | awk '{printf "\"%s\",\n", $1}' | sed '$ s/,$//' >> all_source.json
           echo ']}' >> all_source.json
 
-          # 4. 闭合外壳
+          # 闭合 JSON 外壳
           echo ']}' >> all_source.json
-
-          # 5. 验证我们自己拼接的 JSON 是否合法（可选，但推荐）
-          # jq '.' all_source.json > /dev/null
 
       - name: Compile to Single SRS
         run: |
-          # 将我们拼接好的 all_source.json 直接编译成唯一的 all.srs
+          # 编译成最终的 all.srs
           docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir ghcr.io/sagernet/sing-box:latest rule-set compile all_source.json -o all.srs
 
       - name: Commit and Push SRS
@@ -52,5 +46,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add all.srs
-          git commit -m "Auto update merged all.srs" || echo "No changes to commit"
+          git commit -m "Auto update merged all.srs $(date +'%Y-%m-%d')" || echo "No changes to commit"
           git push

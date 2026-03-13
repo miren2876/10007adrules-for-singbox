@@ -17,7 +17,7 @@ jobs:
       - name: Download upstream AdGuard rule
         run: |
           # 直接下载作者处理好的 auto 版纯净规则
-          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007_auto/master/all" -o all.txt
+          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007/main/all" -o all.txt
 
       - name: Convert to SRS using Sing-box Native Engine
         run: |

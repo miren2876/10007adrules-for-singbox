@@ -1,6 +1,6 @@
 name: Auto Build Sing-box SRS
 
-on:
+于:
   workflow_dispatch: 
   schedule:
     - cron: '0 22 * * *' 
@@ -17,7 +17,7 @@ jobs:
 
       - name: Download upstream reward rule
         run: |
-          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007_auto/master/reward" -o reward.txt
+          curl -sSL "https://raw.githubusercontent.com/lingeringsound/10007/main/reward" -o reward.txt
 
       - name: Convert to SRS using Sing-box
         run: |
